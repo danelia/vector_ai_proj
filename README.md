@@ -1,6 +1,10 @@
 # vector_ai_proj
 
-My initial thought process was to create three endpoints for inserting, updating and deleting and passing table name in post data (last version of readme). The idea was that, if we had to add new table, we would just have to pass it in data, since the operations would be same. But then I realized it would be much better architecture to implement crud for each table. So in final version we have three main endpoints ('/continent', '/country', '/city') with three methods each:
+To build project simply run:
+
+    docker-compose up --build
+
+My initial thought process was to create three endpoints for inserting, updating and deleting and passing table name in post data (see first version of readme: a343f66a1d3541ce83677c0d40fe2aa3f7d41528). The idea was that, if we had to add new table, we would just have to pass it in data, since the operations would be same. But then I realized it would be much better architecture to implement crud for each table. So in final version we have three main endpoints ('/continent', '/country', '/city') with three methods each:
 
 `POST /continent`
 
