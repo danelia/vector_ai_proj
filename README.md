@@ -1,71 +1,37 @@
 # vector_ai_proj
 
-### Part 1
+My initial thought process was to create three endpoints for inserting, updating and deleting and passing table name in post data (last version of readme). The idea was that, if we had to add new table, we would just have to pass it in data, since the operations would be same. But then I realized it would be much better architecture to implement crud for each table. So in final version we have three main endpoints ('/continent', '/country', '/city') with three methods each:
 
-We will use PostgreSQL for our database. We will have three tables: Continent, Country and City. Our validation check for population and area will be handled by triggers (src/triggers.sql) and errors we will handled in python.
-
-I implemented three apis for inserting (/insert), updating (/update) and deleting (/delete). 
-
-`POST /insert`
+`POST /continent`
 
     {
-        'Name' : 'Continent',
-        'Values' : {
-            'name' : 'test_name',
-            'population' : 100,
-            'area' : 10.12
-        }
+        'name' : 'test_name',
+        'population' : 100,
+        'area' : 10.12
     }
 
-##### Response
-    {
-        "Message": "Operation succesful!",
-        "ID": 8
-    }
-    
-`POST /update`
+`PUT /continent/<id>`
 
     {
-    	"Name" : "Continent",
-    	"ID" : 30,
-    	"Values": {
-    		"name" : "jaba",
-    		"population" :10,
-    		"area" : 1
-    	}
+        'name' : 'test_name',
+        'population' : 100,
+        'area' : 10.12
+    }
+
+`DELETE /continent/<id>`
+
+(Same three methods for city and country)
+
+We use celery for worker, rabbitmq for broker and redis for backend. So, for every request we have to start new task and we return that task_id in response. All the responses for above endpoints will be the same:
+
+    {
+        'ID' : "123e4567-e89b-12d3-a456-426614174000"
     }
     
-##### Response
-    {
-        "Message": "Operation succesful!"
-    }
-    
-`POST /delete`
+And we have final endpoint for checking that task:
 
-    {
-    	"Name" : "Continent",
-    	"ID" : 30
-    }
+`GET /check_task/<task_id>`
 
-##### Response
-    
-    {
-        "Message": "Operation Succesfull!",
-        "Deleted_Rows": 8
-    }
+We have three tasks in total (one for inserting, one for updating and one for deleting), described in src/app/tasks.py. Since we have one method for checking task results, all of our tasks return tuple of (ID, ok, message). All db operations are done in these tasks and db errors are handled here as well, that's why we return 'ok' as true or false, if operation succeds or not, 'message' is coresponding message for success or db error(Our triggers also raises exception. That exception is handled here as well and returns such message). And finally 'ID' will be present if and only if operation was to insert and it succeded.
 
-In all previous examples 'Name' should be one of : 'Continent', 'Country', 'City' and the 'Values' dictionary keys are:
-
-    'Continent' : ['name', 'population', 'area']
-    'Country' : ['name', 'population', 'area', 'n_hospitals', 'n_national_parks', 'continent_ id']
-    'City' : ['name', 'population', 'area', 'n_roads', 'n_trees', 'country_id']
-    
-In case of inserting we are waiting for all the keys described above, in case of updating only the fields present will be updated.
-
-For parsing and validating request payload we will use decorator implemented in src/app/helpers.py. If something is missing we will return response with such message.
-
-After validating payload we will do any SQL related task in src/app/tasks.py and handle all errors here as well. Several things may happen: 
-
-Value keys might be wrong - in this case we return message 'Please make sure you send right Values'.
-SQL validation check may trigger - in this case we get error message defined by us in triggers.sql and return it.
-In case of deleting and updating ID may not exists - we return 'No entry with that ID' message.
+I also included custom django command 'python manage.py make_triggers'. All it does is read our triggers.sql file and execute sql command. This is useful because we need our triggers for db validation and when building docker image we can run it after migrations are done and before running server(src/run_web.sh).
