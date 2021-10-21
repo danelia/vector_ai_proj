@@ -3,43 +3,69 @@ from django.shortcuts import render
 from rest_framework import status
 from rest_framework.decorators import api_view
 from rest_framework.response import Response
+from rest_framework.viewsets import ModelViewSet
 
 from .tasks import run_insert_task, run_update_task, run_delete_task
-from .helpers import request_validator
+from project import celery_app
 
-@api_view(['POST'])
-@request_validator(method_name='insert')
-def insert(table_name, values):
-    id_, ok, message = run_insert_task(table_name, values)
 
-    if message is not None:
-        return Response({'Message' : message}, status=status.HTTP_400_BAD_REQUEST)
-    if not ok:
-        # this will only happen if Values dict has wrong field names for selected table
-        return Response({'Message' : 'Please make sure you send right Values'}, status=status.HTTP_400_BAD_REQUEST)
+class ViewSetController(ModelViewSet):
+
+    def __init__(self, model_name):
+        self.model_name = model_name
+
+    def create(self, request):
+        data = self._requst_helper(request)
+        if not data:
+            return Response({'Message' : "Please send data"}, status=status.HTTP_400_BAD_REQUEST)
+
+        task_id = run_insert_task.delay(self.model_name, data)
+        
+        return Response({'ID' : task_id.id}, status=status.HTTP_200_OK)
+
+    def update(self, request, entry_id):
+        data = self._requst_helper(request)
+        if not data:
+            return Response({'Message' : "Please send data"}, status=status.HTTP_400_BAD_REQUEST)
+            
+        task_id = run_update_task.delay(self.model_name, data, entry_id)
+
+        return Response({'ID' : task_id.id}, status=status.HTTP_200_OK)
+
+    def delete(self, request, entry_id):
+        task_id = run_delete_task.delay(self.model_name, entry_id)
+
+        return Response({'ID' : task_id.id}, status=status.HTTP_200_OK)
     
-    return Response({'Message' : 'Operation succesful!', 'ID' : id_}, status=status.HTTP_200_OK)
+    def _requst_helper(self, request):
+        data = request.data
+        data.pop("id", None)
 
-@api_view(['POST'])
-@request_validator(method_name='update')
-def update(table_name, target_id, values):
-    rows_n, ok, message = run_update_task(table_name, target_id, values)
+        return data
+
+class ContinentViewSet(ViewSetController):
+    def __init__(self):
+        super().__init__("Continent")
+
+class CountryViewSet(ViewSetController):
+    def __init__(self):
+        super().__init__("Country")
+
+class CityViewSet(ViewSetController):
+    def __init__(self):
+        super().__init__("City")
+
+@api_view(['GET'])
+def check_task(request, task_id):
+    st = celery_app.AsyncResult(task_id)
+
+    if not st.ready():
+        return Response({'Message' : 'No results for that task_id'}, status=status.HTTP_200_OK)
     
-    if message is not None:
-        return Response({'Message' : message}, status=status.HTTP_400_BAD_REQUEST)
-    if not ok:
-        return Response({'Message' : 'Please make sure you send right Values'}, status=status.HTTP_400_BAD_REQUEST)
-    if rows_n == 0:
-        return Response({'Message' : 'No entry with that ID'}, status=status.HTTP_400_BAD_REQUEST)
+    res, ok, message = st.result
+    resp = {'Message' : message}
 
-    return Response({'Message' : 'Operation succesful!'}, status=status.HTTP_200_OK)
+    if res is not None:
+        resp['ID'] = res
 
-@api_view(['POST'])
-@request_validator(method_name='delete')
-def delete(table_name, target_id):
-    rows_n = run_delete_task(table_name, target_id)
-    
-    if rows_n == 0:
-        return Response({'Message' : 'No entry with that ID'}, status=status.HTTP_400_BAD_REQUEST)
-
-    return Response({'Message' : 'Operation Succesfull!', 'Deleted_Rows' : rows_n}, status=status.HTTP_200_OK)
+    return Response(resp, status=status.HTTP_200_OK if ok else status.HTTP_400_BAD_REQUEST)

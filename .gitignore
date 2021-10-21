@@ -1,4 +1,6 @@
-env/*
-src/app/__pycache__
-src/app/migrations
-src/project/__pycache__
+env
+data
+*/*/migrations
+*/*/__pycache__
+*/*/*/__pycache__
+*/*/*/*/__pycache__

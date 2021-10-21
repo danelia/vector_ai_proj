@@ -12,7 +12,7 @@ class Continent(models.Model):
 class Country(models.Model):
     id                  = models.AutoField(primary_key=True)
 
-    continent                   = models.ForeignKey(Continent, on_delete=models.CASCADE)
+    continent           = models.ForeignKey(Continent, on_delete=models.CASCADE)
 
     name                = models.TextField(blank=False, null=False)
 
@@ -27,7 +27,7 @@ class Country(models.Model):
 class City(models.Model):
     id                     = models.AutoField(primary_key=True)
     
-    country                     = models.ForeignKey(Country, on_delete=models.CASCADE)
+    country                = models.ForeignKey(Country, on_delete=models.CASCADE)
 
     name                   = models.TextField(blank=False, null=False)
 
